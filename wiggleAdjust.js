@@ -23,24 +23,34 @@
 		root.WiggleAdjust = factory();
 	}
 }(this, function () {
-	var WiggleAdjust = function (superGif) {
-		var offset = { x: 0, y: 0 },
+	return function (superGif, identifier, offset) {
+		var storageKey = 'wiggle' + ( identifier || document.location.pathname ),
 			listener = function(e) {
 				var adjusting = true,
 					delta = e.shiftKey ? 10 : 1;
 
 				switch(e.keyCode) {
-					case 37: 
+					case 37:
+					case 72:
 						offset.x -= delta; // left
 						break;
 					case 38:
+					case 74:
 						offset.y -= delta; // up
 						break;
 					case 39:
+					case 76:
 						offset.x += delta; // right
 						break;
 					case 40:
-						offset.y += delta; //down
+					case 75:
+						offset.y += delta; // down
+						break;
+					case 85:
+						offset.r -= delta / 5; // counterclock
+						break;
+					case 73:
+						offset.r += delta / 5; // clockwise
 						break;
 					default:
 						adjusting = false;
@@ -50,21 +60,61 @@
 					return;
 				}
 
-				superGif.set_frame_offset(1, offset);
+				superGif.set_frame_offset( 1, offset );
+				storeOffset( offset );
 				e.preventDefault();
 			},
-			attach = function() {
-				document.addEventListener('keydown', listener, false);
+			mc,
+			swipeHandler = function( e ) {
+				offset.x += e.velocityX;
+				offset.y += e.velocityY;
+				superGif.set_frame_offset( 1, offset );
+				storeOffset( offset );
 			},
-			detach = function() {
-				document.removeEventListener('keydown', listener, false);
+			storeOffset = function( offset ) {
+				var serialized = offset.x + '|' + offset.y + '|' + offset.r;
+				window.localStorage.setItem( storageKey, serialized );
 			},
-			getOffset = function() {
-				return offset;
+			getStoredOffset = function() {
+				var serialized = window.localStorage.getItem( storageKey ),
+					exploded,
+					result;
+				if ( !serialized ) {
+					return false;
+				}
+				exploded = serialized.split( '|' );
+				result = {
+					x: parseInt( exploded[0], 10 ),
+					y: parseInt( exploded[1], 10 )
+				};
+				if ( exploded.length > 2 ) {
+					result.r = parseInt( exploded[2] );
+				} else {
+					result.r = 0;
+				}
+				return result;
 			};
-
-		attach();
+		offset = offset || { x: 0, y: 0, r: 0 };
+		return {
+			attach: function() {
+				var storedOffset = getStoredOffset();
+				document.addEventListener('keydown', listener, false);
+				mc = new Hammer.Manager(document.body);
+				mc.add( new Hammer.Swipe({ direction: Hammer.DIRECTION_ALL, threshold: 0 } ) );
+				mc.on( 'swipe', swipeHandler );
+				if ( storedOffset ) {
+					offset = storedOffset;
+				}
+				superGif.set_frame_offset( 1, offset );
+			},
+			detach: function() {
+				document.removeEventListener('keydown', listener, false);
+				mc.remove( 'swipe' );
+				mc.destroy();
+			},
+			getOffset: function() {
+				return offset;
+			}
+		};
 	};
-
-	return WiggleAdjust;
 }));
