@@ -8,9 +8,12 @@
  * var wiggleAdjuster = new WiggleAdjuster(superGif);
  * superGif.play();
  * 
- * Arrow keys move the second frame of the gif around, one pixel per press
- * normally, or ten pixels per press when the shift key is held.
- * 
+ * Arrow keys or HJKL move the second frame of the gif around, one pixel
+ * per press normally, or ten pixels per press when the shift key is held.
+ * U and I rotate the second frame by .2 degrees normally, 2 with shift.
+ * If the HammerJS library is present, swipe actions also work for linear
+ * offset adjustments.
+ *
  * Limitations:
  * currently only works for a single image on a page.
  */
@@ -88,7 +91,7 @@
 					y: parseInt( exploded[1], 10 )
 				};
 				if ( exploded.length > 2 ) {
-					result.r = parseInt( exploded[2] );
+					result.r = parseFloat( exploded[2] );
 				} else {
 					result.r = 0;
 				}
@@ -99,9 +102,11 @@
 			attach: function() {
 				var storedOffset = getStoredOffset();
 				document.addEventListener('keydown', listener, false);
-				mc = new Hammer.Manager(document.body);
-				mc.add( new Hammer.Swipe({ direction: Hammer.DIRECTION_ALL, threshold: 0 } ) );
-				mc.on( 'swipe', swipeHandler );
+                                if ( typeof Hammer === 'object' ) {
+					mc = new Hammer.Manager(document.body);
+					mc.add( new Hammer.Swipe({ direction: Hammer.DIRECTION_ALL, threshold: 0 } ) );
+					mc.on( 'swipe', swipeHandler );
+				}
 				if ( storedOffset ) {
 					offset = storedOffset;
 				}
@@ -109,8 +114,10 @@
 			},
 			detach: function() {
 				document.removeEventListener('keydown', listener, false);
-				mc.remove( 'swipe' );
-				mc.destroy();
+				if ( mc ) {
+					mc.remove( 'swipe' );
+					mc.destroy();
+				}
 			},
 			getOffset: function() {
 				return offset;
